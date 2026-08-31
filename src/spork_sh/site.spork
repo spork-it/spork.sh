@@ -15,6 +15,7 @@
 
 (def site-url "https://spork.sh")
 (def github-url "https://github.com/spork-it/spork-lang")
+(def site-source-url "https://github.com/spork-it/spork.sh")
 (def default-description
   "Spork is a Lisp hosted on CPython, with direct Python interoperability, persistent collections, macros, and project tools.")
 
@@ -120,9 +121,10 @@
           ($a {:href github-url} "source")
           ($a {:href "https://pypi.org/project/spork-lang/"} "PyPI"))
         ($p {:class "footer-note"}
-          "Built from Spork source with "
+          ($a {:href site-source-url} "site source")
+          " · built with "
           ($a {:href "https://github.com/spork-it/spork-site"} "spork-site")
-          ". MIT licensed · 2026.")))))
+          " · MIT licensed · 2026.")))))
 
 (defn document-shell [document body]
   (markup
