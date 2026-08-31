@@ -1121,6 +1121,7 @@ pre code {
     padding: 0;
     position: fixed;
     top: 4.25rem;
+    transition: top 160ms ease;
     width: 2.5rem;
     z-index: 61;
   }
@@ -1167,8 +1168,12 @@ pre code {
     transform: rotate(-45deg);
   }
 
+  .has-docs-menu .docs-menu-toggle.is-scrolled,
   .has-docs-menu .docs-menu-toggle[aria-expanded="true"] {
     top: 1rem;
+  }
+
+  .has-docs-menu .docs-menu-toggle[aria-expanded="true"] {
     z-index: 101;
   }
 
@@ -1301,7 +1306,7 @@ pre code {
     grid-template-columns: auto minmax(0, 1fr);
   }
 
-  .footer-inner > div p {
+  .footer-tagline {
     display: none;
   }
 
@@ -1330,6 +1335,13 @@ pre code {
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
+  }
+
+  .docs-menu-toggle,
+  .docs-menu-icon,
+  .docs-menu-icon::before,
+  .docs-menu-icon::after {
+    transition: none;
   }
 }
 

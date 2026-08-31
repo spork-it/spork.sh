@@ -8,6 +8,28 @@
     if (!button || !panel) return;
 
     const mobile = window.matchMedia("(max-width: 48rem)");
+    const header = document.querySelector(".site-header");
+    let positionFrame = null;
+
+    const updateButtonPosition = () => {
+      button.classList.toggle(
+        "is-scrolled",
+        Boolean(header && header.getBoundingClientRect().bottom <= 0),
+      );
+      positionFrame = null;
+    };
+
+    const requestButtonPositionUpdate = () => {
+      if (positionFrame === null) {
+        positionFrame = window.requestAnimationFrame(updateButtonPosition);
+      }
+    };
+
+    window.addEventListener("scroll", requestButtonPositionUpdate, {
+      passive: true,
+    });
+    window.addEventListener("resize", requestButtonPositionUpdate);
+    updateButtonPosition();
 
     const isOpen = () => button.getAttribute("aria-expanded") === "true";
 

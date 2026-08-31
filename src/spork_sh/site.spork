@@ -61,7 +61,7 @@
         ($meta {:id "theme-color" :name "theme-color" :content "#f2eee4"})
         ($script {:src "/theme.js"})
         (if (.startswith (:route document) "/docs/")
-          ($script {:src "/docs-menu.js" :defer true})
+          ($script {:src "/docs-menu.js?v=0.1.0" :defer true})
           nil)
         (if (= (:route document) "/docs/search/")
           ($script {:src "/docs-search.js" :defer true})
@@ -71,7 +71,7 @@
           nil)
         ($link {:rel "canonical" :href (canonical-url document)})
         ($link {:rel "icon" :href "/favicon.svg" :type "image/svg+xml"})
-        ($link {:rel "stylesheet" :href "/site.css"})
+        ($link {:rel "stylesheet" :href "/site.css?v=0.1.0"})
         ($meta {:property "og:type" :content "website"})
         ($meta {:property "og:site_name" :content "Spork"})
         ($meta {:property "og:title" :content title})
@@ -117,7 +117,7 @@
       ($div {:class "footer-inner"}
         ($div
           ($strong "spork")
-          ($p "A Lisp hosted on CPython."))
+          ($p {:class "footer-tagline"} "A Lisp hosted on CPython."))
         ($nav {:aria-label "Footer navigation"}
           ($a {:href "/get/"} "install")
           ($a {:href "/docs/"} "docs")
