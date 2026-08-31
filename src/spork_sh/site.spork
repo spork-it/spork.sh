@@ -60,6 +60,9 @@
         ($meta {:name "color-scheme" :content "light dark"})
         ($meta {:id "theme-color" :name "theme-color" :content "#f2eee4"})
         ($script {:src "/theme.js"})
+        (if (.startswith (:route document) "/docs/")
+          ($script {:src "/docs-menu.js" :defer true})
+          nil)
         (if (= (:route document) "/docs/search/")
           ($script {:src "/docs-search.js" :defer true})
           nil)
@@ -387,23 +390,34 @@
       (markup
         ($main {:id "main-content" :class "docs-shell page-width"}
           ($aside {:class "docs-sidebar"}
-            ($p {:class "sidebar-title"} "documentation")
-            ($nav {:aria-label "Documentation navigation"}
-              ($a {:class (if (= (:route document) "/docs/search/")
-                            "sidebar-search is-active"
-                            "sidebar-search")
-                   :href "/docs/search/"
-                   :aria-current (if (= (:route document) "/docs/search/")
-                                   "page"
-                                   nil)}
-                "search")
-              (for [group (docs.navigation-groups documents)]
-                (docs-sidebar-group document group)))
-            ($div {:class "sidebar-note"}
-              ($strong version-label)
-              ($span "CPython 3.10–3.14")
-              ($a {:href (+ "https://github.com/spork-it/" (:project document))}
-                "source ↗")))
+            ($button {:class "docs-menu-toggle"
+                      :type "button"
+                      :aria-controls "docs-menu-panel"
+                      :aria-expanded "false"
+                      :aria-label "Open documentation picker"
+                      :data-docs-menu-toggle true}
+              ($span {:class "docs-menu-icon" :aria-hidden "true"})
+              ($span {:class "visually-hidden"} "Documentation"))
+            ($div {:id "docs-menu-panel"
+                   :class "docs-menu-panel"
+                   :data-docs-menu-panel true}
+              ($p {:id "docs-menu-title" :class "sidebar-title"} "documentation")
+              ($nav {:aria-label "Documentation navigation"}
+                ($a {:class (if (= (:route document) "/docs/search/")
+                              "sidebar-search is-active"
+                              "sidebar-search")
+                     :href "/docs/search/"
+                     :aria-current (if (= (:route document) "/docs/search/")
+                                     "page"
+                                     nil)}
+                  "search")
+                (for [group (docs.navigation-groups documents)]
+                  (docs-sidebar-group document group)))
+              ($div {:class "sidebar-note"}
+                ($strong version-label)
+                ($span "CPython 3.10–3.14")
+                ($a {:href (+ "https://github.com/spork-it/" (:project document))}
+                  "source ↗"))))
           ($article {:class "docs-article prose"}
             (breadcrumb-nav document)
             ($header {:class "page-heading"}
