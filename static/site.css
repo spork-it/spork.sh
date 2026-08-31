@@ -1301,6 +1301,10 @@ pre code {
     grid-template-columns: auto minmax(0, 1fr);
   }
 
+  .footer-inner > div p {
+    display: none;
+  }
+
   .footer-inner nav {
     margin-left: auto;
   }
