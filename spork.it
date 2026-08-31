@@ -1,0 +1,12 @@
+{:name "spork-sh"
+ :version "0.1.0"
+ :description "The public Spork website"
+ :requires-python ">=3.10"
+ :spork-version "==0.6.0"
+ :dependencies ["spork-site==0.1.1"]
+ :source-paths ["src"]
+ :test-paths ["tests"]
+
+ :site
+ {:target "spork-sh.site:make-site"
+  :watch ["spork.it" "src" "content" "static"]}}

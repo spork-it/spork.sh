@@ -1,0 +1,170 @@
+#!/bin/sh
+set -eu
+
+# Spork installer for Linux, macOS, and WSL.
+# Published at https://spork.sh/install
+
+umask 022
+
+fail() {
+    printf '%s\n' "Error: $*" >&2
+    exit 1
+}
+
+# Keep every destructive path anchored below a normal absolute home directory.
+if [ -z "${HOME:-}" ]; then
+    fail "HOME is not set."
+fi
+case "$HOME" in
+    /*) ;;
+    *) fail "HOME must be an absolute path." ;;
+esac
+if [ ! -d "$HOME" ]; then
+    fail "HOME does not name an existing directory."
+fi
+if ! HOME_DIR=$(CDPATH= cd -P "$HOME" 2>/dev/null && pwd -P); then
+    fail "could not resolve HOME."
+fi
+if [ "$HOME_DIR" = "/" ]; then
+    fail "refusing to install with HOME resolving to /."
+fi
+
+SPORK_HOME="$HOME_DIR/.spork"
+BIN_DIR="$HOME_DIR/.local/bin"
+VENV_DIR="$SPORK_HOME/venv"
+LAUNCHER="$BIN_DIR/spork"
+BACKUP_DIR="$SPORK_HOME/venv.backup.$$"
+TEMP_LAUNCHER="$BIN_DIR/.spork-launcher.$$"
+PYPI_URL="https://pypi.org/simple"
+
+# Refuse surprising filesystem layouts rather than deleting through them.
+if [ -L "$SPORK_HOME" ]; then
+    fail "$SPORK_HOME is a symbolic link; refusing to modify it."
+fi
+if [ -e "$SPORK_HOME" ] && [ ! -d "$SPORK_HOME" ]; then
+    fail "$SPORK_HOME exists and is not a directory."
+fi
+if [ -L "$VENV_DIR" ]; then
+    fail "$VENV_DIR is a symbolic link; refusing to remove it."
+fi
+if [ -e "$VENV_DIR" ] && [ ! -d "$VENV_DIR" ]; then
+    fail "$VENV_DIR exists and is not a managed environment."
+fi
+if [ -e "$BIN_DIR" ] && [ ! -d "$BIN_DIR" ]; then
+    fail "$BIN_DIR exists and is not a directory."
+fi
+if [ -e "$LAUNCHER" ] && [ ! -L "$LAUNCHER" ]; then
+    fail "$LAUNCHER exists and is not a symbolic link; refusing to replace it."
+fi
+if [ -L "$LAUNCHER" ] && [ -d "$LAUNCHER" ]; then
+    fail "$LAUNCHER points to a directory; refusing to replace it."
+fi
+if [ -e "$BACKUP_DIR" ] || [ -L "$BACKUP_DIR" ]; then
+    fail "temporary backup path already exists: $BACKUP_DIR"
+fi
+if [ -e "$TEMP_LAUNCHER" ] || [ -L "$TEMP_LAUNCHER" ]; then
+    fail "temporary launcher path already exists: $TEMP_LAUNCHER"
+fi
+
+# Check the host before touching an existing installation.
+if ! command -v python3 >/dev/null 2>&1; then
+    fail "CPython 3.10 or newer is required."
+fi
+if ! python3 -I -c 'import platform, sys; raise SystemExit(platform.python_implementation() != "CPython" or sys.version_info < (3, 10))'; then
+    fail "CPython 3.10 or newer is required."
+fi
+
+mkdir -p "$SPORK_HOME" "$BIN_DIR"
+
+had_previous=false
+committed=false
+
+cleanup() {
+    status=$?
+    trap - 0 1 2 15
+    set +e
+    rm -f "$TEMP_LAUNCHER"
+    if [ "$committed" != true ]; then
+        rm -rf "$VENV_DIR"
+        if [ "$had_previous" = true ] && [ -d "$BACKUP_DIR" ]; then
+            mv "$BACKUP_DIR" "$VENV_DIR"
+            printf '%s\n' "The previous Spork installation was restored." >&2
+        fi
+    fi
+    exit "$status"
+}
+
+trap cleanup 0
+trap 'exit 129' 1
+trap 'exit 130' 2
+trap 'exit 143' 15
+
+printf '%s\n' "Installing Spork to $SPORK_HOME"
+
+# Move the old managed environment aside. It is deleted only after the new
+# environment and launcher have both been verified and installed.
+if [ -d "$VENV_DIR" ]; then
+    printf '%s\n' "   Moving the previous environment aside..."
+    mv "$VENV_DIR" "$BACKUP_DIR"
+    had_previous=true
+fi
+
+printf '%s\n' "   Creating a fresh virtual environment..."
+if ! python3 -I -m venv "$VENV_DIR"; then
+    fail "could not create the virtual environment."
+fi
+
+# --isolated ignores user pip configuration and PIP_* environment variables.
+# The explicit index prevents an unexpected package source from being used.
+printf '%s\n' "   Updating pip from PyPI..."
+if ! "$VENV_DIR/bin/python" -I -m pip --isolated --disable-pip-version-check \
+    install --quiet --no-input --upgrade --index-url "$PYPI_URL" pip; then
+    fail "could not update pip."
+fi
+
+printf '%s\n' "   Installing spork-lang from PyPI..."
+if ! "$VENV_DIR/bin/python" -I -m pip --isolated --disable-pip-version-check \
+    install --quiet --no-input --no-cache-dir --index-url "$PYPI_URL" spork-lang; then
+    fail "could not install spork-lang."
+fi
+
+if [ ! -x "$VENV_DIR/bin/spork" ]; then
+    fail "the installed package did not provide the spork command."
+fi
+if ! SPORK_VERSION=$("$VENV_DIR/bin/python" -I -c \
+    'from importlib.metadata import version; print(version("spork-lang"))'); then
+    fail "could not verify the installed spork-lang version."
+fi
+
+# Build a new symlink under a unique name, then replace the old managed
+# symlink with one rename. A non-symlink launcher was rejected above.
+if ! ln -s "$VENV_DIR/bin/spork" "$TEMP_LAUNCHER"; then
+    fail "could not create the command symlink."
+fi
+if ! mv -f "$TEMP_LAUNCHER" "$LAUNCHER"; then
+    fail "could not install the command symlink."
+fi
+
+# The new installation is now usable. Keep it in place even if deleting the
+# old backup reports a filesystem error.
+committed=true
+
+# Remove the old environment rather than accumulating stale Spork packages,
+# as promised by the clean installer.
+if [ "$had_previous" = true ]; then
+    printf '%s\n' "   Removing the previous environment..."
+    if ! rm -rf "$BACKUP_DIR"; then
+        fail "could not remove the previous environment."
+    fi
+fi
+
+trap - 0 1 2 15
+
+printf '\n%s\n' "Spork $SPORK_VERSION installed successfully!"
+printf '%s\n\n' "   Binary location: $LAUNCHER"
+
+case ":$PATH:" in
+    *":$BIN_DIR:"*) ;;
+    *) printf '%s\n' "   Warning: $BIN_DIR is not in your PATH."
+       printf '%s\n' '   Add this to your shell config: export PATH="$HOME/.local/bin:$PATH"' ;;
+esac

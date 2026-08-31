@@ -1,0 +1,565 @@
+(ns spork-sh.docs
+  (:require
+    [spork-site.markdown :as markdown]
+    [spork-site.nodes :refer [Element Fragment RawHtml Text sequence-value?]]
+    [std.json :as json])
+  (:import
+    [html :refer [unescape]]
+    [re :as re]
+    [urllib.parse :refer [unquote urljoin urlsplit]]))
+
+(def site-url "https://spork.sh")
+
+(def package-versions
+  {"spork-lang" "0.6.0"
+   "spork-runtime" "0.1.1"
+   "spork-pds" "0.1.4"
+   "spork-state" "0.2.1"
+   "spork-site" "0.1.1"})
+
+(def group-details
+  {"start" {:label "Start" :order 10}
+   "guides" {:label "Guides" :order 20}
+   "language" {:label "Language reference" :order 30
+               :route "/docs/reference/language/"}
+   "standard-library" {:label "Standard library" :order 40
+                       :route "/docs/reference/standard-library/"}
+   "tooling" {:label "Tooling reference" :order 50
+              :route "/docs/reference/tooling/"}
+   "packages" {:label "Packages" :order 60 :route "/docs/packages/"}
+   "editors" {:label "Editors" :order 70 :route "/docs/editors/"}
+   "examples" {:label "Examples" :order 80 :route "/docs/examples/"}})
+
+;; Navigation paths may be arbitrarily deep. Every non-root path receives one
+;; centrally defined label, order, and landing route so repeated front matter
+;; cannot make the hierarchy inconsistent.
+(def nested-navigation-details
+  {"packages/spork-lang"
+     {:label "spork-lang" :order 10 :route "/docs/packages/spork-lang/"}
+   "packages/spork-runtime"
+     {:label "spork-runtime" :order 20 :route "/docs/packages/spork-runtime/"}
+   "packages/spork-pds"
+     {:label "spork-pds" :order 30 :route "/docs/packages/spork-pds/"}
+   "packages/spork-state"
+     {:label "spork-state" :order 40 :route "/docs/packages/spork-state/"}
+   "packages/spork-site"
+     {:label "spork-site" :order 50 :route "/docs/packages/spork-site/"}})
+
+(defn make-documentation-parser []
+  (let [parser (markdown.make-parser)]
+    (parser.enable "table")
+    parser))
+
+(def documentation-parser (make-documentation-parser))
+
+(def heading-tags #{"h2" "h3"})
+(def documentation-sections #{"start" "guide" "reference" "package" "editor" "example"})
+(def utility-routes #{"/docs/search/"})
+(def heading-cleaner (re.compile "[^a-z0-9]+"))
+(def html-tag (re.compile "<[^>]*>"))
+(def whitespace (re.compile "\\s+"))
+
+(def known-nondocument-routes
+  #{"/favicon.svg"
+    "/install"
+    "/install.sha256"
+    "/robots.txt"
+    "/site.css"
+    "/sitemap.xml"
+    "/theme.js"
+    "/docs-search.js"
+    "/docs/search.json"})
+
+(defn documentation? [document]
+  (.startswith (:route document) "/docs/"))
+
+(defn navigable? [document]
+  (and (documentation? document)
+       (not (is (get document :nav true) false))))
+
+(defn nonempty-string? [value]
+  (and (isinstance value str) (not (= (.strip value) ""))))
+
+(defn invalid-navigation-segment? [segment]
+  (not (nonempty-string? segment)))
+
+(defn package-version [document]
+  (get package-versions (:project document)))
+
+(defn group-detail [group]
+  (get group-details group {:label group :order 999}))
+
+(defn group-label [group]
+  (:label (group-detail group)))
+
+(defn group-route [group]
+  (get (group-detail group) :route))
+
+(defn navigation-path [document]
+  (get document :nav-path [(:group document)]))
+
+(defn navigation-path-key [path]
+  (.join "/" path))
+
+(defn navigation-detail [path]
+  (if (= (count path) 1)
+    (get group-details (first path))
+    (get nested-navigation-details (navigation-path-key path))))
+
+(defn navigation-path-prefix? [prefix path]
+  (and (<= (count prefix) (count path))
+       (= prefix (into [] (take (count prefix) path)))))
+
+(defn navigation-node-active? [document node]
+  (navigation-path-prefix? (:path node) (navigation-path document)))
+
+(defn node-text [node]
+  "Extract normalized visible text from an immutable markup tree."
+  (let [value
+        (cond
+          (isinstance node Text) node.value
+          (isinstance node RawHtml) (unescape (html-tag.sub " " node.value))
+          (isinstance node Element)
+            (.join " " (map node-text node.children))
+          (isinstance node Fragment)
+            (.join " " (map node-text node.children))
+          :else "")]
+    (.strip (whitespace.sub " " value))))
+
+(defn heading-slug [title]
+  (let [candidate (.strip (heading-cleaner.sub "-" (.lower title)) "-")]
+    (if (= candidate "") "section" candidate)))
+
+(defn decorate-children [children seen headings]
+  (loop [remaining (seq children)
+         output []
+         current-seen seen
+         current-headings headings]
+    (if (= remaining nil)
+      {:children output :seen current-seen :headings current-headings}
+      (let [result (decorate-node (first remaining) current-seen current-headings)]
+        (recur (rest remaining)
+               (conj output (:node result))
+               (:seen result)
+               (:headings result))))))
+
+(defn decorate-node [node seen headings]
+  (cond
+    (isinstance node Element)
+      (if (contains? heading-tags node.tag)
+        (let [title (node-text node)
+              requested (get node.attrs "id")
+              base (if (= requested nil) (heading-slug title) requested)
+              occurrence (get seen base 0)
+              identifier (if (= occurrence 0)
+                           base
+                           (fmt "{}-{}" base (+ occurrence 1)))
+              heading {:id identifier
+                       :title title
+                       :level (int (get node.tag 1))}
+              result (decorate-children node.children
+                                        (assoc seen base (+ occurrence 1))
+                                        (conj headings heading))
+              permalink (Element "a"
+                                 {"class" "heading-anchor"
+                                  "href" (+ "#" identifier)
+                                  "aria-label" (+ "Link to " title)}
+                                 ["#"])]
+          {:node (Element node.tag
+                          (assoc node.attrs "id" identifier)
+                          (conj (:children result) permalink))
+           :seen (:seen result)
+           :headings (:headings result)})
+        (let [result (decorate-children node.children seen headings)
+              decorated (Element node.tag node.attrs (:children result))
+              output (if (= node.tag "table")
+                       (Element "div" {"class" "documentation-table"}
+                                [decorated])
+                       decorated)]
+          {:node output
+           :seen (:seen result)
+           :headings (:headings result)}))
+    (isinstance node Fragment)
+      (let [result (decorate-children node.children seen headings)]
+        {:node (Fragment (:children result))
+         :seen (:seen result)
+         :headings (:headings result)})
+    (or (isinstance node Text) (isinstance node RawHtml))
+      {:node node :seen seen :headings headings}
+    :else
+      (throw (TypeError "documentation content must use immutable markup nodes"))))
+
+(defn prepare-document [document]
+  (let [search-text (node-text (:content document))
+        result (decorate-node (:content document) {} [])]
+    (-> document
+        (assoc :content (:node result))
+        (assoc :headings (:headings result))
+        (assoc :search-text search-text))))
+
+(defn prepare-documents [documents]
+  (for [document documents]
+    (prepare-document document)))
+
+(defn metadata-error [document message]
+  (ValueError (fmt "documentation metadata error in {}: {}"
+                   (:relative-path document)
+                   message)))
+
+(defn validate-document-metadata [document]
+  (if (not (nonempty-string? (:title document)))
+    (throw (metadata-error document "title is required")))
+  (if (not (nonempty-string? (:description document)))
+    (throw (metadata-error document "description is required")))
+  (if (not (nonempty-string? (:section document)))
+    (throw (metadata-error document "section is required")))
+  (if (not (contains? documentation-sections (:section document)))
+    (throw (metadata-error document
+                           (fmt "unknown section {}" (repr (:section document))))))
+  (if (not (nonempty-string? (:group document)))
+    (throw (metadata-error document "group is required")))
+  (if (not (contains? group-details (:group document)))
+    (throw (metadata-error document
+                           (fmt "unknown navigation group {}" (repr (:group document))))))
+  (let [path (navigation-path document)]
+    (if (or (not (sequence-value? path))
+            (= (count path) 0)
+            (some invalid-navigation-segment? path))
+      (throw (metadata-error document
+                             "nav-path must be a non-empty sequence of names")))
+    (if (not (= (first path) (:group document)))
+      (throw (metadata-error document
+                             "nav-path must begin with the document group")))
+    (doseq [depth (range 1 (+ (count path) 1))]
+      (let [prefix (into [] (take depth path))]
+        (if (= (navigation-detail prefix) nil)
+          (throw (metadata-error document
+                                 (fmt "unknown navigation path {}"
+                                      (repr (navigation-path-key prefix)))))))))
+  (if (or (not (isinstance (:order document) int))
+          (isinstance (:order document) bool)
+          (< (:order document) 0))
+    (throw (metadata-error document "non-negative integer order is required")))
+  (let [nav-title (get document :nav-title)
+        version-label (get document :version-label)]
+    (if (and (not (= nav-title nil)) (not (nonempty-string? nav-title)))
+      (throw (metadata-error document "nav-title must be a non-empty string")))
+    (if (and (not (= version-label nil))
+             (not (nonempty-string? version-label)))
+      (throw (metadata-error document
+                             "version-label must be a non-empty string"))))
+  (if (not (contains? package-versions (:project document)))
+    (throw (metadata-error document
+                           (fmt "unknown project {}" (repr (:project document))))))
+  (if (and (is (get document :nav true) false)
+           (not (is (get document :utility false) true)))
+    (throw (metadata-error document
+                           "nav: false documents must declare utility: true")))
+  (if (and (is (get document :nav true) false)
+           (not (contains? utility-routes (:route document))))
+    (throw (metadata-error document
+                           "utility document is not linked by the documentation shell")))
+  (let [declared-version (get document :package-version)
+        current-version (package-version document)]
+    (if (and (not (= declared-version nil))
+             (not (= declared-version current-version)))
+      (throw (metadata-error document
+                             (fmt "package-version {} does not match documented version {}"
+                                  declared-version current-version)))))
+  document)
+
+(defn direct-navigation-documents [documents path]
+  (into []
+        (sorted
+          (filter (fn [document]
+                    (and (navigable? document)
+                         (= (navigation-path document) path)))
+                  documents)
+          * :key (fn [document]
+                   (tuple [(:order document) (:route document)])))))
+
+(defn navigation-node-key [path]
+  (let [detail (navigation-detail path)]
+    (tuple [(:order detail) (navigation-path-key path)])))
+
+(defn child-navigation-paths [documents path]
+  (let [depth (count path)
+        paths
+          (reduce
+            (fn [found document]
+              (let [candidate (navigation-path document)]
+                (if (and (navigable? document)
+                         (> (count candidate) depth)
+                         (navigation-path-prefix? path candidate))
+                  (conj found (into [] (take (+ depth 1) candidate)))
+                  found)))
+            #{}
+            documents)]
+    (into [] (sorted paths *{:key navigation-node-key}))))
+
+(defn navigation-node [documents path]
+  (let [detail (navigation-detail path)]
+    {:id (last path)
+     :path path
+     :label (:label detail)
+     :route (get detail :route)
+     :documents (direct-navigation-documents documents path)
+     :children (for [child (child-navigation-paths documents path)]
+                 (navigation-node documents child))}))
+
+(defn navigation-groups [documents]
+  (let [paths
+        (reduce
+          (fn [found document]
+            (if (navigable? document)
+              (conj found [(first (navigation-path document))])
+              found))
+          #{}
+          documents)]
+    (for [path (sorted paths *{:key navigation-node-key})]
+      (navigation-node documents path))))
+
+(defn flatten-navigation-node [node]
+  (reduce into
+          (:documents node)
+          (map flatten-navigation-node (:children node))))
+
+(defn navigation-documents [documents]
+  (reduce into [] (map flatten-navigation-node (navigation-groups documents))))
+
+(defn validate-navigation-orders [documents]
+  (reduce
+    (fn [seen document]
+      (let [key (tuple [(navigation-path-key (navigation-path document))
+                        (:order document)])]
+        (if (contains? seen key)
+          (throw
+            (metadata-error
+              document
+              (fmt "navigation order {} is already used by {}"
+                   (:order document)
+                   (:relative-path (get seen key)))))
+          (assoc seen key document))))
+    {}
+    (filter navigable? documents))
+  documents)
+
+(defn validate-navigation-landings [documents]
+  (let [routes (set (map :route documents))
+        paths
+          (reduce
+            (fn [found document]
+              (if (navigable? document)
+                (reduce
+                  (fn [result depth]
+                    (conj result
+                          (into [] (take depth (navigation-path document)))))
+                  found
+                  (range 1 (+ (count (navigation-path document)) 1)))
+                found))
+            #{}
+            documents)]
+    (doseq [path paths]
+      (let [landing (get (navigation-detail path) :route)]
+        (if (and (not (= landing nil)) (not (contains? routes landing)))
+          (throw
+            (ValueError
+              (fmt "documentation navigation path {} is missing landing page {}"
+                   (navigation-path-key path) landing)))))))
+  documents)
+
+(defn validate-metadata [documents]
+  (doseq [document documents]
+    (if (documentation? document)
+      (validate-document-metadata document)))
+  (-> documents
+      (validate-navigation-orders)
+      (validate-navigation-landings)))
+
+(defn document-neighbors [documents route]
+  (let [all (navigation-documents documents)
+        current (some (fn [document]
+                        (if (= (:route document) route) document nil))
+                      all)
+        ordered (if (= current nil)
+                  []
+                  (into []
+                        (filter (fn [document]
+                                  (= (navigation-path document)
+                                     (navigation-path current)))
+                                all)))
+        total (count ordered)]
+    (loop [index 0]
+      (if (>= index total)
+        {:previous nil :next nil}
+        (if (= (:route (nth ordered index)) route)
+          {:previous (if (> index 0) (nth ordered (- index 1)) nil)
+           :next (if (< (+ index 1) total) (nth ordered (+ index 1)) nil)}
+          (recur (+ index 1)))))))
+
+(defn breadcrumb-items [document]
+  (if (= (:route document) "/docs/")
+    [{:label "Home" :href "/"}
+     {:label "Docs" :href nil}]
+    (let [path (navigation-path document)
+          hierarchy
+            (reduce
+              (fn [items depth]
+                (let [detail (navigation-detail
+                               (into [] (take depth path)))
+                      route (get detail :route)]
+                  (if (= route nil)
+                    items
+                    (conj items
+                          {:label (:label detail)
+                           :href (if (= route (:route document)) nil route)}))))
+              []
+              (range 1 (+ (count path) 1)))
+          current-in-hierarchy?
+            (some (fn [item] (= (:href item) nil)) hierarchy)
+          base [{:label "Home" :href "/"}
+                {:label "Docs" :href "/docs/"}]]
+      (if current-in-hierarchy?
+        (into base hierarchy)
+        (conj (into base hierarchy)
+              {:label (:title document) :href nil})))))
+
+(defn search-record [document]
+  {:route (:route document)
+   :title (:title document)
+   :description (:description document)
+   :project (:project document)
+   :section (:section document)
+   :group (:group document)
+   :nav-path (navigation-path document)
+   :headings (for [heading (:headings document)]
+               {:id (:id heading) :title (:title heading)})
+   :text (:search-text document)})
+
+(defn search-documents [documents]
+  (filter (fn [document]
+            (and (documentation? document)
+                 (not (is (get document :draft false) true))
+                 (not (is (get document :alias false) true))
+                 (if (is (get document :nav true) false)
+                   (is (get document :search false) true)
+                   (not (is (get document :search true) false)))))
+          documents))
+
+(defn search-output [documents]
+  (+ (json.dumps (for [document (search-documents documents)]
+                   (search-record document))
+                 * :ensure-ascii false
+                   :sort-keys true
+                   :separators (tuple ["," ":"]))
+     "\n"))
+
+(defn collect-attribute [node attribute]
+  (cond
+    (isinstance node Element)
+      (let [own (get node.attrs attribute)
+            descendants (reduce into []
+                                (map (fn [child]
+                                       (collect-attribute child attribute))
+                                     node.children))]
+        (if (= own nil) descendants (into [own] descendants)))
+    (isinstance node Fragment)
+      (reduce into []
+              (map (fn [child] (collect-attribute child attribute))
+                   node.children))
+    :else []))
+
+(defn document-table [documents]
+  (reduce (fn [table document]
+            (assoc table (:route document) document))
+          {}
+          documents))
+
+(defn target-route [known path]
+  (cond
+    (contains? known path) path
+    (and (not (.endswith path "/"))
+         (contains? known (+ path "/"))) (+ path "/")
+    :else nil))
+
+(defn internal-link [source-route href]
+  (let [parsed (urlsplit href)]
+    (cond
+      (and (not (= parsed.scheme ""))
+           (not (= parsed.netloc "spork.sh"))) nil
+      (and (= parsed.scheme "") (not (= parsed.netloc ""))) nil
+      :else
+        (let [absolute (urlsplit (urljoin (+ site-url source-route) href))]
+          (if (not (= absolute.netloc "spork.sh"))
+            nil
+            {:path (if (= absolute.path "") source-route absolute.path)
+             :fragment (unquote absolute.fragment)})))))
+
+(defn validate-fragment [source target-document fragment]
+  (if (not (= fragment ""))
+    (let [ids (set (collect-attribute (:content target-document) "id"))]
+      (if (and (not (= fragment "main-content"))
+               (not (contains? ids fragment)))
+        (throw
+          (ValueError
+            (fmt "broken documentation fragment in {}: #{} does not exist at {}"
+                 (:relative-path source) fragment (:route target-document))))))))
+
+(defn migrated-github-document? [href]
+  (let [parsed (urlsplit href)]
+    (and (= parsed.netloc "github.com")
+         (or (in "/docs/LANG.md" parsed.path)
+             (in "/docs/PROJECTS.md" parsed.path)
+             (in "/docs/STDLIB.md" parsed.path)
+             (and (in "/spork-it/spork-pds/" parsed.path)
+                  (in "/docs/" parsed.path))
+             (and (in "/spork-it/spork-state/" parsed.path)
+                  (in "/docs/" parsed.path))
+             (and (in "/spork-it/spork-site/" parsed.path)
+                  (in "/README.md" parsed.path))))))
+
+(defn validate-link [documents table known source href]
+  (if (migrated-github-document? href)
+    (throw
+      (ValueError
+        (fmt "noncanonical link to migrated documentation in {}: {}"
+             (:relative-path source) href))))
+  (let [target (internal-link (:route source) href)]
+    (if (not (= target nil))
+      (let [route (target-route known (:path target))]
+        (if (= route nil)
+          (throw
+            (ValueError
+              (fmt "broken internal link in {}: {}"
+                   (:relative-path source) href))))
+        (if (and (not (= (:fragment target) ""))
+                 (contains? table route))
+          (validate-fragment source (get table route) (:fragment target)))))))
+
+(defn validate-links [documents]
+  (let [table (document-table documents)
+        known (into known-nondocument-routes (map :route documents))]
+    (doseq [document documents]
+      (doseq [href (collect-attribute (:content document) "href")]
+        (validate-link documents table known document href)))
+    documents))
+
+(defn validate-identifiers [documents]
+  (doseq [document documents]
+    (reduce
+      (fn [seen identifier]
+        (if (contains? seen identifier)
+          (throw
+            (ValueError
+              (fmt "duplicate document id in {}: {}"
+                   (:relative-path document) identifier)))
+          (conj seen identifier)))
+      #{}
+      (collect-attribute (:content document) "id")))
+  documents)
+
+(defn validate-documents [documents]
+  (-> documents
+      (validate-metadata)
+      (validate-identifiers)
+      (validate-links)))

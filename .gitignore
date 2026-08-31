@@ -1,0 +1,8 @@
+.DS_Store
+.venv/
+.spork-out/
+build/
+dist/
+public/
+*.egg-info/
+__pycache__/

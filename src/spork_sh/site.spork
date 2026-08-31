@@ -1,0 +1,470 @@
+(ns spork-sh.site
+  (:require
+    [spork-site.build :as build]
+    [spork-site.content :as content]
+    [spork-site.core :refer [element fragment markup raw-html]]
+    [spork-site.highlight :refer [highlight-syntax]]
+    [spork-site.nodes :refer [RawHtml]]
+    [spork-site.routing :as routing]
+    [spork-site.sitemap :as sitemap]
+    [spork-site.transforms :as transforms]
+    [spork-sh.docs :as docs])
+  (:import
+    [hashlib :refer [sha256]]
+    [pathlib :refer [Path]]))
+
+(def site-url "https://spork.sh")
+(def github-url "https://github.com/spork-it/spork-lang")
+(def default-description
+  "Spork is a Lisp hosted on CPython, with direct Python interoperability, persistent collections, macros, and project tools.")
+
+(def primary-links
+  [{:href "/docs/" :label "docs"}
+   {:href "/get/" :label "install"}
+   {:href "https://github.com/spork-it/spork-lang" :label "source"}])
+
+(def home-example
+  "(defn greet [name]\n  (fmt \"Hello, {}!\" name))\n\n(print (greet \"Spork\"))")
+
+(def interop-example
+  "(ns python-demo\n  (:import [math :refer [sqrt]]\n           [pathlib :refer [Path]]))\n\n(def report (Path \"build/report.txt\"))\n\n(print report.suffix)\n(print (sqrt 81))")
+
+(def collection-example
+  "(def original\n  {:language \"Spork\" :version 1})\n\n(def current\n  (-> original\n      (assoc :version 2)\n      (assoc :status :pre-1.0)))\n\n(print [(:version original)\n        (:version current)])")
+
+(def project-example
+  "{:name \"hello\"\n :version \"0.1.0\"\n :requires-python \">=3.10\"\n :spork-version \">=0.6,<0.7\"\n :source-paths [\"src\"]\n :test-paths [\"tests\"]}")
+
+(defn page-description [document]
+  (get document :description (get document :summary default-description)))
+
+(defn page-title [document]
+  (if (= (:route document) "/")
+    "Spork — a Lisp hosted on CPython"
+    (fmt "{} · Spork" (:title document))))
+
+(defn canonical-url [document]
+  (+ site-url (:route document)))
+
+(defn document-head [document]
+  (let [description (page-description document)
+        title (page-title document)]
+    (markup
+      ($head
+        ($meta {:charset "utf-8"})
+        ($meta {:name "viewport"
+                :content "width=device-width, initial-scale=1"})
+        ($title title)
+        ($meta {:name "description" :content description})
+        ($meta {:name "color-scheme" :content "light dark"})
+        ($meta {:id "theme-color" :name "theme-color" :content "#f2eee4"})
+        ($script {:src "/theme.js"})
+        (if (= (:route document) "/docs/search/")
+          ($script {:src "/docs-search.js" :defer true})
+          nil)
+        (if (is (get document :sitemap true) false)
+          ($meta {:name "robots" :content "noindex"})
+          nil)
+        ($link {:rel "canonical" :href (canonical-url document)})
+        ($link {:rel "icon" :href "/favicon.svg" :type "image/svg+xml"})
+        ($link {:rel "stylesheet" :href "/site.css"})
+        ($meta {:property "og:type" :content "website"})
+        ($meta {:property "og:site_name" :content "Spork"})
+        ($meta {:property "og:title" :content title})
+        ($meta {:property "og:description" :content description})
+        ($meta {:property "og:url" :content (canonical-url document)})
+        ($meta {:name "twitter:card" :content "summary"})))))
+
+(defn route-active? [route href]
+  (or (= route href)
+      (and (= href "/docs/")
+           (.startswith route "/docs/"))))
+
+(defn primary-link [document link]
+  (let [active? (route-active? (:route document) (:href link))]
+    (markup
+      ($a {:class (if active? "is-active" nil)
+           :href (:href link)
+           :aria-current (if active? "page" nil)}
+        (:label link)))))
+
+(defn site-header [document]
+  (markup
+    ($header {:class "site-header"}
+      ($div {:class "header-inner"}
+        ($a {:class "brand"
+             :href "/"
+             :aria-label (+ "Spork v" (get docs.package-versions "spork-lang") " home")}
+          ($span {:aria-hidden "true"} "(")
+          (+ "spork@v" (get docs.package-versions "spork-lang"))
+          ($span {:aria-hidden "true"} ")"))
+        ($nav {:class "primary-nav" :aria-label "Primary navigation"}
+          (for [link primary-links]
+            (primary-link document link))
+          ($button {:class "theme-toggle"
+                    :type "button"
+                    :data-theme-toggle true
+                    :aria-label "Use dark theme"}
+            "dark"))))))
+
+(defn site-footer []
+  (markup
+    ($footer {:class "site-footer"}
+      ($div {:class "footer-inner"}
+        ($div
+          ($strong "spork")
+          ($p "A Lisp hosted on CPython."))
+        ($nav {:aria-label "Footer navigation"}
+          ($a {:href "/get/"} "install")
+          ($a {:href "/docs/"} "docs")
+          ($a {:href github-url} "source")
+          ($a {:href "https://pypi.org/project/spork-lang/"} "PyPI"))
+        ($p {:class "footer-note"}
+          "Built from Spork source with "
+          ($a {:href "https://github.com/spork-it/spork-site"} "spork-site")
+          ". MIT licensed · 2026.")))))
+
+(defn document-shell [document body]
+  (markup
+    (raw-html "<!doctype html>")
+    ($html {:lang "en"}
+      (document-head document)
+      ($body
+        ($a {:class "skip-link" :href "#main-content"} "Skip to content")
+        (site-header document)
+        body
+        (site-footer)))))
+
+(defn code-block [label language source command output]
+  (highlight-syntax
+    (markup
+      ($figure {:class "code-block"}
+        ($figcaption label)
+        ($pre
+          ($code {:class (+ "language-" language)} source))
+        (if (= command nil)
+          nil
+          ($div {:class "code-run"}
+            ($code {:class "code-command"} command)
+            (if (= output nil)
+              nil
+              ($code {:class "code-output"} output))))))))
+
+(defn installer-sha256 []
+  "Calculate the published installer's SHA-256 from its source bytes."
+  (let [source (.read-bytes (Path "static/install"))]
+    (.hexdigest (sha256 source))))
+
+(defn installer-checksum-output []
+  (+ (installer-sha256) "  install\n"))
+
+(def installer-verification-marker "<!-- installer-verification -->")
+
+(defn installer-verification []
+  (let [checksum (installer-sha256)]
+    (markup
+      ($aside {:class "installer-verification"
+               :aria-labelledby "installer-checksum-title"}
+        ($p {:id "installer-checksum-title" :class "installer-label"}
+          "current installer / SHA-256")
+        ($code {:class "installer-digest"} checksum)
+        ($p
+          "This value is calculated from the installer source whenever the page is built. To download and verify before running:")
+        ($pre
+          ($code
+            (+ "curl -fsSLO https://spork.sh/install\n"
+               "curl -fsSLO https://spork.sh/install.sha256\n\n"
+               "# Linux\n"
+               "sha256sum -c install.sha256\n\n"
+               "# macOS\n"
+               "shasum -a 256 -c install.sha256\n\n"
+               "sh install")))))))
+
+(defn inject-installer-verification [content]
+  (transforms.transform
+    content
+    (fn [node]
+      (if (and (isinstance node RawHtml)
+               (= (.strip node.value) installer-verification-marker))
+        (installer-verification)
+        node))))
+
+(defn home-page [document]
+  (document-shell
+    document
+    (markup
+      ($main {:id "main-content"}
+        ($section {:class "home-hero page-width"}
+          ($div {:class "home-hero-grid"}
+            ($div
+              ($h1 "spork")
+              ($p {:class "home-tagline"} "a Lisp hosted on CPython"))
+            ($div {:class "home-intro"}
+              ($p {:class "home-summary"}
+                "Spork compiles Lisp forms to Python's AST. Python remains the runtime, import system, and package ecosystem. Spork adds expression-oriented forms, macros, persistent collections, and project tooling.")
+              ($nav {:class "home-links" :aria-label "Start with Spork"}
+                ($a {:href "/get/"} "install Spork →")
+                ($a {:href "/docs/"} "open the docs →")
+                ($a {:href github-url} "view source ↗")))))
+        ($section {:class "home-section page-width"}
+          ($div {:class "section-copy"}
+            ($h2 "Run a source file.")
+            ($p
+              "A .spork file can run directly. No manifest, scaffold, or separate build step is required; project configuration becomes useful when you need dependencies, tests, and packaging.")
+            ($p
+              ($a {:href "/get/"} "install Spork →")))
+          (code-block "hello.spork" "spork" home-example
+            "$ spork hello.spork" "Hello, Spork!"))
+        ($section {:class "home-section page-width"}
+          ($div {:class "section-copy"}
+            ($h2 "Import Python directly.")
+            (:content document)
+            ($p
+              ($a {:href "/docs/python-interop/"} "read the interop guide →")))
+          (code-block "python.spork" "spork" interop-example
+            "$ spork python.spork" ".txt\n9.0"))
+        ($section {:class "home-section page-width"}
+          ($div {:class "section-copy"}
+            ($h2 "Use expressions, macros, and persistent data.")
+            ($p
+              "Forms are expressions, application code can define macros, and collection updates return new persistent values instead of changing the original. These are language features rather than wrapper APIs.")
+            ($p
+              ($a {:href "/docs/language/"} "take the language tour →")))
+          (code-block "persistent.spork" "spork" collection-example
+            "$ spork persistent.spork" "[1 2]"))
+        ($section {:class "home-section page-width"}
+          ($div {:class "section-copy"}
+            ($h2 "Add a manifest for a project.")
+            ($p
+              "A spork.it file declares the toolchain, source paths, tests, and ordinary Python dependencies. Spork keeps the project environment isolated and uses it for checks, tests, runs, and distribution builds.")
+            ($p
+              ($a {:href "/docs/projects/"} "see the project workflow →")))
+          (code-block "spork.it" "spork" project-example
+            "$ spork sync && spork test" nil))))))
+
+(defn docs-link [document target]
+  (let [active? (= (:route document) (:route target))]
+    (markup
+      ($a {:href (:route target)
+           :class (if active? "is-active" nil)
+           :aria-current (if active? "page" nil)}
+        (get target :nav-title (:title target))))))
+
+(defn docs-sidebar-subgroup [document node]
+  (markup
+    ($details {:class "sidebar-subgroup"
+               :open (docs.navigation-node-active? document node)}
+      ($summary {:class "sidebar-subgroup-title"} (:label node))
+      ($div {:class "sidebar-navigation-children"}
+        (for [target (:documents node)]
+          (docs-link document target))
+        (for [child (:children node)]
+          (docs-sidebar-subgroup document child))))))
+
+(defn docs-sidebar-group [document group]
+  (markup
+    ($details {:class "sidebar-group"
+               :open (docs.navigation-node-active? document group)}
+      ($summary {:class "sidebar-group-title"} (:label group))
+      ($div {:class "sidebar-navigation-children"}
+        (for [target (:documents group)]
+          (docs-link document target))
+        (for [child (:children group)]
+          (docs-sidebar-subgroup document child))))))
+
+(defn breadcrumb-nav [document]
+  (markup
+    ($nav {:class "breadcrumbs" :aria-label "Breadcrumb"}
+      ($ol
+        (for [item (docs.breadcrumb-items document)]
+          ($li
+            (if (= (:href item) nil)
+              ($span {:aria-current (if (= (:label item) (:title document))
+                                      "page"
+                                      nil)}
+                (:label item))
+              ($a {:href (:href item)} (:label item)))))))))
+
+(defn table-of-contents [document]
+  (if (= (count (:headings document)) 0)
+    nil
+    (markup
+      ($aside {:class "page-toc" :aria-labelledby "page-toc-title"}
+        ($p {:id "page-toc-title"} "on this page")
+        ($ol
+          (for [heading (:headings document)]
+            ($li {:class (+ "toc-level-" (str (:level heading)))}
+              ($a {:href (+ "#" (:id heading))} (:title heading)))))))))
+
+(defn documentation-pagination [documents document]
+  (let [neighbors (docs.document-neighbors documents (:route document))
+        previous (:previous neighbors)
+        next (:next neighbors)]
+    (if (and (= previous nil) (= next nil))
+      nil
+      (markup
+        ($nav {:class "docs-pagination" :aria-label "Documentation pages"}
+          (if (= previous nil)
+            ($span {:aria-hidden "true"} "")
+            ($a {:class "previous" :href (:route previous)}
+              ($small "previous")
+              (get previous :nav-title (:title previous))))
+          (if (= next nil)
+            ($span {:aria-hidden "true"} "")
+            ($a {:class "next" :href (:route next)}
+              ($small "next")
+              (get next :nav-title (:title next)))))))))
+
+(defn documentation-directory-node [current node level]
+  (let [targets (into []
+                      (filter (fn [target]
+                                (not (= (:route target) (:route current))))
+                              (:documents node)))
+        heading-level (min level 6)]
+    (markup
+      ($section {:class "docs-directory-group"}
+        (element (+ "h" (str heading-level)) {} [(:label node)])
+        (if (> (count targets) 0)
+          ($ul
+            (for [target targets]
+              ($li
+                ($a {:href (:route target)} (:title target))
+                ($span (:description target)))))
+          nil)
+        (for [child (:children node)]
+          (documentation-directory-node current child (+ level 1)))))))
+
+(defn documentation-directory [documents current group-filter]
+  (let [all-groups (docs.navigation-groups documents)
+        groups (if (= group-filter nil)
+                 all-groups
+                 (let [matched (some (fn [group]
+                                       (if (= (:id group) group-filter)
+                                         group
+                                         nil))
+                                     all-groups)]
+                   (if (= matched nil) [] (:children matched))))
+        title (if (= group-filter "packages")
+                "Browse packages"
+                "Browse documentation")]
+    (markup
+      ($section {:class "docs-directory" :aria-labelledby "docs-directory-title"}
+        ($h2 {:id "docs-directory-title"} title)
+        ($div
+          (for [group groups]
+            (documentation-directory-node current group 3)))
+        ($p
+          ($a {:href "/docs/search/"} "search all documentation →"))))))
+
+(defn documentation-search []
+  (markup
+    ($form {:class "docs-search-form"
+            :role "search"
+            :action "/docs/search/"
+            :method "get"
+            :data-docs-search true}
+      ($label {:for "docs-search-query"} "Search terms")
+      ($div
+        ($input {:id "docs-search-query"
+                 :name "q"
+                 :type "search"
+                 :autocomplete "off"
+                 :placeholder "macro, transient, spork.it…"
+                 :data-docs-search-input true})
+        ($button {:type "submit"} "search")))
+    ($p {:class "search-status" :data-docs-search-status true
+         :aria-live "polite"})
+    ($ol {:class "search-results" :data-docs-search-results true})))
+
+(defn documentation-page [documents document]
+  (let [version (docs.package-version document)
+        version-label (get document :version-label
+                           (+ (:project document) " " version))]
+    (document-shell
+      document
+      (markup
+        ($main {:id "main-content" :class "docs-shell page-width"}
+          ($aside {:class "docs-sidebar"}
+            ($p {:class "sidebar-title"} "documentation")
+            ($nav {:aria-label "Documentation navigation"}
+              ($a {:class (if (= (:route document) "/docs/search/")
+                            "sidebar-search is-active"
+                            "sidebar-search")
+                   :href "/docs/search/"
+                   :aria-current (if (= (:route document) "/docs/search/")
+                                   "page"
+                                   nil)}
+                "search")
+              (for [group (docs.navigation-groups documents)]
+                (docs-sidebar-group document group)))
+            ($div {:class "sidebar-note"}
+              ($strong version-label)
+              ($span "CPython 3.10–3.14")
+              ($a {:href (+ "https://github.com/spork-it/" (:project document))}
+                "source ↗")))
+          ($article {:class "docs-article prose"}
+            (breadcrumb-nav document)
+            ($header {:class "page-heading"}
+              ($h1 (:title document))
+              ($p {:class "document-version"}
+                version-label)
+              (if (get document :description)
+                ($p {:class "page-description"} (:description document))
+                nil))
+            (cond
+              (= (:route document) "/docs/")
+                (documentation-directory documents document nil)
+              (= (:route document) "/docs/packages/")
+                (documentation-directory documents document "packages")
+              :else
+                (table-of-contents document))
+            (if (= (:route document) "/docs/getting-started/")
+              (inject-installer-verification (:content document))
+              (:content document))
+            (if (= (:route document) "/docs/search/")
+              (documentation-search)
+              nil)
+            (documentation-pagination documents document)))))))
+
+(defn standard-page [document]
+  (document-shell
+    document
+    (markup
+      ($main {:id "main-content" :class "standard-page page-width"}
+        ($article {:class "prose"}
+          ($header {:class "page-heading"}
+            ($h1 (:title document))
+            (if (get document :description)
+              ($p {:class "page-description"} (:description document))
+              nil))
+          (:content document))))))
+
+(defn render-document [documents document]
+  (cond
+    (= (:route document) "/") (home-page document)
+    (.startswith (:route document) "/docs/")
+      (documentation-page documents document)
+    :else (standard-page document)))
+
+
+(def robots-output
+  (+ "User-agent: *\n"
+     "Allow: /\n\n"
+     "Sitemap: https://spork.sh/sitemap.xml\n"))
+
+(defn make-site []
+  (let [loaded (content.load-documents
+                 "content" *{:parser docs.documentation-parser})
+        documents (docs.validate-documents (docs.prepare-documents loaded))
+        render (fn [document] (render-document documents document))]
+    (build.site
+      * :output "public"
+        :pages [(routing.pages-for documents render)
+                (routing.output-file "/sitemap.xml"
+                  (sitemap.sitemap site-url documents))
+                (routing.output-file "/robots.txt" robots-output)
+                (routing.output-file "/install.sha256"
+                  (installer-checksum-output))
+                (routing.output-file "/docs/search.json"
+                  (docs.search-output documents))]
+        :assets (build.discover-assets "static"))))

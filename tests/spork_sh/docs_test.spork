@@ -1,0 +1,125 @@
+(ns spork-sh.docs-test
+  (:require
+    [spork-site.content :as content]
+    [spork-site.nodes :refer [Element Fragment RawHtml]]
+    [spork-sh.docs :as docs]
+    [std.json :as json]))
+
+(defn raises? [expected-type function]
+  (try
+    (do (function) false)
+    (catch Exception error
+      (if (isinstance error expected-type)
+        true
+        (throw error)))))
+
+(defn prepared-documents []
+  (docs.prepare-documents
+    (content.load-documents "content" *{:parser docs.documentation-parser})))
+
+(defn document-at [documents route]
+  (some (fn [document]
+          (if (= (:route document) route) document nil))
+        documents))
+
+(deftest heading-decoration-is-stable-and-unique
+  (let [document {:content (Fragment
+                             [(Element "h2" {} ["Repeated heading"])
+                              (Element "h3" {} ["Repeated heading"])
+                              (Element "p" {} ["Body"])] )
+                  :route "/docs/example/"}
+        prepared (docs.prepare-document document)
+        headings (:headings prepared)
+        ids (mapv :id headings)]
+    (assert (= ids ["repeated-heading" "repeated-heading-2"]))
+    (assert (= (count ids) (count (set ids))))
+    (assert (= (docs.node-text (:content prepared))
+               "Repeated heading # Repeated heading # Body"))))
+
+(deftest current-document-metadata-builds-navigation-and-neighbors
+  (let [documents (docs.validate-documents (prepared-documents))
+        groups (docs.navigation-groups documents)
+        language (document-at documents "/docs/language/")
+        packages (some (fn [group]
+                         (if (= (:id group) "packages") group nil))
+                       groups)
+        pds (some (fn [node]
+                    (if (= (:id node) "spork-pds") node nil))
+                  (:children packages))
+        pds-api (document-at documents "/docs/packages/spork-pds/api/")
+        pds-neighbors (docs.document-neighbors documents (:route pds-api))
+        neighbors (docs.document-neighbors documents (:route language))]
+    (assert (= (mapv :label groups)
+               ["Start" "Guides" "Language reference" "Standard library"
+                "Tooling reference" "Packages" "Editors" "Examples"]))
+    (assert (= (docs.package-version language) "0.6.0"))
+    (assert (= (mapv :label (:children packages))
+               ["spork-lang" "spork-runtime" "spork-pds" "spork-state" "spork-site"]))
+    (assert (= (count (:documents pds)) 6))
+    (assert (= (:route (:previous pds-neighbors))
+               "/docs/packages/spork-pds/guide/"))
+    (assert (= (:route (:next pds-neighbors))
+               "/docs/packages/spork-pds/design/"))
+    (assert (= (:previous neighbors) nil))
+    (assert (= (:route (:next neighbors)) "/docs/python-interop/"))
+    (assert (= (:id (first (:headings language))) "values-and-calls"))))
+
+(deftest generated-search-index-is-deterministic-and-excludes-utility-page
+  (let [documents (docs.validate-documents (prepared-documents))
+        first-output (docs.search-output documents)
+        second-output (docs.search-output documents)
+        records (json.loads first-output true)
+        routes (set (map :route records))]
+    (assert (= first-output second-output))
+    (assert (= (count records) 75))
+    (assert (contains? routes "/docs/language/"))
+    (assert (not (contains? routes "/docs/search/")))))
+
+(deftest metadata-and-internal-link-errors-fail-before-building
+  (let [base {:title "Example"
+              :description "Example document."
+              :section "guide"
+              :group "guides"
+              :project "spork-lang"
+              :order 1
+              :relative-path "docs/example.md"
+              :route "/docs/example/"
+              :content (Fragment [])
+              :headings []}
+        broken-route (assoc base :content
+                            (Element "a" {"href" "/does-not-exist/"} ["bad"]))
+        obsolete-link (assoc base :content
+                             (Element "a"
+                               {"href" "https://github.com/spork-it/spork-lang/blob/v0.6.0/docs/LANG.md"}
+                               ["old manual"]))
+        target (-> base
+                   (assoc :order 2)
+                   (assoc :route "/docs/target/")
+                   (assoc :relative-path "docs/target.md")
+                   (assoc :content (Element "h2" {"id" "present"} ["Target"])))
+        broken-fragment (assoc base :content
+                               (Element "a" {"href" "/docs/target/#missing"}
+                                        ["bad fragment"]))]
+    (assert (raises? ValueError
+                     (fn [] (docs.validate-metadata [(assoc base :group "unknown")]))))
+    (assert (raises? ValueError
+                     (fn []
+                       (docs.validate-metadata
+                         [(assoc base :nav-path ["guides" "unknown"])]))))
+    (assert (raises? ValueError
+                     (fn []
+                       (docs.validate-metadata
+                         [(assoc base :package-version "0.5.0")]))))
+    (assert (raises? ValueError
+                     (fn []
+                       (docs.validate-identifiers
+                         [(assoc base :content
+                           (Element "div" {}
+                             [(Element "span" {"id" "same"} [])
+                              (Element "span" {"id" "same"} [])]))]))))
+    (assert (raises? ValueError
+                     (fn [] (docs.validate-links [broken-route]))))
+    (assert (raises? ValueError
+                     (fn [] (docs.validate-links [obsolete-link]))))
+    (assert (raises? ValueError
+                     (fn [] (docs.validate-links [broken-fragment target]))))))

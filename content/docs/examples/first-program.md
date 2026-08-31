@@ -1,0 +1,85 @@
+---
+title: First program
+description: Run a single Spork file using persistent collections, Python interop, matching, annotations, and a macro.
+section: example
+group: examples
+project: spork-lang
+order: 810
+package-version: "0.6.0"
+changefreq: monthly
+priority: 0.6
+---
+
+Save this complete program as `first.spork`:
+
+```spork
+(ns examples.readme
+  (:require [std.json :as j])
+  (:import [os]))
+
+;; Vectors
+(def v [1 2 3])
+(def v2 (conj v 4))
+(print v)  ; [1 2 3] - original is unchanged
+(print v2) ; [1 2 3 4] - new structure sharing memory with old
+
+;; Maps
+(def m {:name "Spork" :version 1})
+(def m2 (assoc m :version 2))
+(print m)  ; {:name "Spork", :version 1}
+(print m2) ; {:name "Spork", :version 2}
+
+;; Sets
+(def s #{1 2 3})
+(contains? s 2) ; true
+
+; create new subset of s without 2
+(def s2 (disj s 2))
+(print s)  ; #{1 2 3}
+(print s2) ; #{1 3}
+
+;; Method calls (dot syntax)
+(def text "hello world")
+(text.upper) ; "HELLO WORLD"
+
+;; Attribute access
+(print os.name)
+
+;; Mixing Python types (escape hatch)
+(def py-list (list [1 2 3])) ; Convert Spork Vector to Python list
+(print (fmt "py-list before: {}" py-list))
+(py-list.append 4)          ; Mutate it in place
+
+(print (fmt "py-list after: {}" py-list))
+
+;; Make a map to print as JSON
+(def data {:name "Spork" :version 1.0}) ; persistent Spork map
+(print (fmt "Json: {}" (j.dumps data))) ; '{"name": "Spork", "version": 1.0}'
+
+(defn describe [x]
+  (match x
+    0 "zero"
+    (^int n) (+ "integer: " (str n))
+    [a b] (+ "vector pair: " (str a) ", " (str b))
+    {:keys [name]} (+ "Hello " name)
+    _ "something else"))
+
+(defn ^int add [^int x ^int y]
+  (+ x y))
+
+(defmacro unless [test & body]
+  `(if ~test
+     nil
+     (do ~@body)))
+
+(unless (= (add 1 1) 3)
+  (print "Math still works"))
+```
+
+Run it directly without creating a manifest:
+
+```bash
+spork first.spork
+```
+
+The file requires `std.json`, manipulates persistent vectors, maps, and sets, creates a mutable Python list at an explicit boundary, and defines both a function using pattern matching and a macro. Continue with the [language tour](/docs/language/) for each form and the [project guide](/docs/projects/) when the program grows beyond one file.
