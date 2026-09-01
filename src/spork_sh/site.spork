@@ -21,6 +21,7 @@
 
 (def primary-links
   [{:href "/docs/" :label "docs"}
+   {:href "/play/" :label "play"}
    {:href "/get/" :label "install"}
    {:href "https://github.com/spork-it/spork-lang" :label "source"}])
 
@@ -66,12 +67,15 @@
         (if (= (:route document) "/docs/search/")
           ($script {:src "/docs-search.js" :defer true})
           nil)
+        (if (= (:route document) "/play/")
+          ($script {:src "/playground.js?v=0.1.0" :defer true})
+          nil)
         (if (is (get document :sitemap true) false)
           ($meta {:name "robots" :content "noindex"})
           nil)
         ($link {:rel "canonical" :href (canonical-url document)})
         ($link {:rel "icon" :href "/favicon.svg" :type "image/svg+xml"})
-        ($link {:rel "stylesheet" :href "/site.css?v=0.1.0"})
+        ($link {:rel "stylesheet" :href "/site.css?v=0.2.0"})
         ($meta {:property "og:type" :content "website"})
         ($meta {:property "og:site_name" :content "Spork"})
         ($meta {:property "og:title" :content title})
@@ -121,6 +125,7 @@
         ($nav {:aria-label "Footer navigation"}
           ($a {:href "/get/"} "install")
           ($a {:href "/docs/"} "docs")
+          ($a {:href "/play/"} "play")
           ($a {:href github-url} "source")
           ($a {:href "https://pypi.org/project/spork-lang/"} "PyPI"))
         ($p {:class "footer-note"}

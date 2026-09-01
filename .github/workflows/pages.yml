@@ -6,6 +6,8 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    - cron: "23 5 * * 1"
 
 permissions:
   contents: read
@@ -53,21 +55,47 @@ jobs:
       - name: Test installer safety and rollback
         run: sh tests/install_test.sh
 
+      - name: Cache Pyodide cross-build environment
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pyodide-build
+          key: pyodide-${{ runner.os }}-${{ runner.arch }}-314.0.6-emscripten-5.0.3-build-0.39.0
+
+      - name: Install playground build tools
+        run: |
+          python -m pip install \
+            "pyodide-build==0.39.0" \
+            "setuptools==84.0.0" \
+            "wheel==0.48.0"
+          pyodide xbuildenv install 314.0.6
+          pyodide xbuildenv install-emscripten
+
+      - name: Build browser runtime
+        run: |
+          test ! -e static/playground-runtime
+          python tools/build_playground_runtime.py
+
       - name: Validate site plan
         run: spork site check
 
       - name: Build production site
-        run: spork site build
+        run: |
+          spork site build
+          cp -R build/playground-runtime/assets/playground-runtime public/
 
       - name: Verify deterministic rebuild
         run: |
           find public -type f -print0 | sort -z | xargs -0 sha256sum > /tmp/spork-site-before.sha256
           spork site build
+          cp -R build/playground-runtime/assets/playground-runtime public/
           find public -type f -print0 | sort -z | xargs -0 sha256sum > /tmp/spork-site-after.sha256
           diff -u /tmp/spork-site-before.sha256 /tmp/spork-site-after.sha256
 
       - name: Verify generated links and fragments
         run: python tools/verify_site.py
+
+      - name: Verify playground assets
+        run: python tools/verify_playground_assets.py
 
       - name: Verify Pages output
         run: |
@@ -78,6 +106,10 @@ jobs:
           test -f public/robots.txt
           test -f public/docs/search.json
           test -f public/docs-search.js
+          test -f public/play/index.html
+          test -f public/playground.js
+          test -f public/playground-worker.js
+          test -f public/playground-runtime/runtime.json
           test -f public/install
           test -f public/install.sha256
           sh -n public/install
