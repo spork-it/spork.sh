@@ -9,6 +9,110 @@ const TRANSCRIPT_LIMIT_CHARS = 256 * 1024;
 const TRANSCRIPT_LIMIT_ENTRIES = 100;
 const encoder = new TextEncoder();
 
+const SPECIAL_FORMS = new Set([
+  "and", "case", "catch", "cond", "def", "defmacro", "defn", "do", "else",
+  "finally", "fn", "for", "if", "import", "let", "loop", "match", "ns", "or",
+  "quote", "recur", "require", "set!", "throw", "try", "var", "when", "while",
+]);
+const BUILTINS = new Set([
+  "*", "+", "-", "/", "<", "<=", "=", ">", ">=", "assoc", "conj", "cons",
+  "contains?", "count", "dissoc", "empty?", "filter", "first", "fmt", "get",
+  "into", "keys", "map", "next", "not", "nth", "print", "println", "reduce",
+  "rest", "seq", "str", "update", "vals", "vec", "vector", "zipmap",
+]);
+const LITERALS = new Set(["false", "nil", "true"]);
+const NUMBER_TOKEN = /^[+-]?(?:0[xX][0-9a-fA-F]+|0[bB][01]+|0[oO][0-7]+|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)$/;
+
+function appendToken(parent, text, kind = "") {
+  if (!kind) {
+    parent.append(document.createTextNode(text));
+    return;
+  }
+  const token = document.createElement("span");
+  token.className = `tok-${kind}`;
+  token.textContent = text;
+  parent.append(token);
+}
+
+function tokenKind(token) {
+  if (SPECIAL_FORMS.has(token)) return "form";
+  if (BUILTINS.has(token)) return "builtin";
+  if (LITERALS.has(token)) return "literal";
+  if (NUMBER_TOKEN.test(token)) return "number";
+  if (token.startsWith(":")) return "keyword";
+  if (token.startsWith("\\")) return "string";
+  return "";
+}
+
+function highlightSpork(source, target) {
+  const fragment = document.createDocumentFragment();
+  let index = 0;
+  while (index < source.length) {
+    const character = source[index];
+
+    if (/\s/.test(character) || character === ",") {
+      let end = index + 1;
+      while (end < source.length && (/\s/.test(source[end]) || source[end] === ",")) {
+        end += 1;
+      }
+      appendToken(fragment, source.slice(index, end));
+      index = end;
+      continue;
+    }
+
+    if (character === ";") {
+      let end = source.indexOf("\n", index);
+      if (end === -1) end = source.length;
+      appendToken(fragment, source.slice(index, end), "comment");
+      index = end;
+      continue;
+    }
+
+    if (character === '"' || (character === "#" && source[index + 1] === '"')) {
+      let end = index + (character === "#" ? 2 : 1);
+      let escaped = false;
+      while (end < source.length) {
+        const current = source[end++];
+        if (current === '"' && !escaped) break;
+        if (current === "\\" && !escaped) {
+          escaped = true;
+        } else {
+          escaped = false;
+        }
+      }
+      appendToken(fragment, source.slice(index, end), character === "#" ? "regex" : "string");
+      index = end;
+      continue;
+    }
+
+    if ("()[]{}".includes(character)) {
+      appendToken(fragment, character, "delimiter");
+      index += 1;
+      continue;
+    }
+
+    if ("'`~@^".includes(character) || (character === "#" && "_{(".includes(source[index + 1] || ""))) {
+      const length = (character === "~" && source[index + 1] === "@") || character === "#" ? 2 : 1;
+      appendToken(fragment, source.slice(index, index + length), "reader");
+      index += length;
+      continue;
+    }
+
+    let end = index + 1;
+    while (
+      end < source.length &&
+      !/\s/.test(source[end]) &&
+      !"()[]{}\";'`~@^,".includes(source[end])
+    ) {
+      end += 1;
+    }
+    const token = source.slice(index, end);
+    appendToken(fragment, token, tokenKind(token));
+    index = end;
+  }
+  target.replaceChildren(fragment);
+}
+
 class SporkPlayground extends HTMLElement {
   constructor() {
     super();
@@ -23,6 +127,8 @@ class SporkPlayground extends HTMLElement {
     this.transcriptChars = 0;
 
     this.source = this.querySelector("[data-playground-source]");
+    this.highlight = this.querySelector("[data-playground-highlight]");
+    this.highlightCode = this.highlight?.querySelector("code");
     this.runButton = this.querySelector("[data-playground-run]");
     this.stopButton = this.querySelector("[data-playground-stop]");
     this.resetButton = this.querySelector("[data-playground-reset]");
@@ -35,6 +141,8 @@ class SporkPlayground extends HTMLElement {
   connectedCallback() {
     if (
       !this.source ||
+      !this.highlight ||
+      !this.highlightCode ||
       !this.runButton ||
       !this.stopButton ||
       !this.resetButton ||
@@ -50,13 +158,11 @@ class SporkPlayground extends HTMLElement {
     this.resetButton.addEventListener("click", () => this.reset());
     this.clearButton.addEventListener("click", () => this.clearTranscript());
     this.retryButton.addEventListener("click", () => this.restart("retry"));
-    this.source.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
-        event.preventDefault();
-        this.run();
-      }
-    });
+    this.source.addEventListener("input", () => this.renderHighlight());
+    this.source.addEventListener("scroll", () => this.syncHighlightScroll());
+    this.source.addEventListener("keydown", (event) => this.handleEditorKeydown(event));
     this.classList.add("is-enhanced");
+    this.renderHighlight();
     this.restart("initial");
   }
 
@@ -64,6 +170,34 @@ class SporkPlayground extends HTMLElement {
     this.clearTimers();
     this.worker?.terminate();
     this.worker = null;
+  }
+
+  handleEditorKeydown(event) {
+    if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+      event.preventDefault();
+      this.run();
+      return;
+    }
+    if (event.key === "Tab" && !event.shiftKey && !event.ctrlKey && !event.metaKey) {
+      event.preventDefault();
+      this.source.setRangeText(
+        "  ",
+        this.source.selectionStart,
+        this.source.selectionEnd,
+        "end",
+      );
+      this.renderHighlight();
+    }
+  }
+
+  renderHighlight() {
+    highlightSpork(this.source.value, this.highlightCode);
+    this.syncHighlightScroll();
+  }
+
+  syncHighlightScroll() {
+    this.highlight.scrollTop = this.source.scrollTop;
+    this.highlight.scrollLeft = this.source.scrollLeft;
   }
 
   clearTimers() {
@@ -200,7 +334,6 @@ class SporkPlayground extends HTMLElement {
     this.pendingRequestId = id;
     this.evaluating = true;
     this.setStatus("evaluating…", "evaluating");
-    this.appendEntry("source", source);
     this.updateControls();
     this.worker.postMessage({
       version: PROTOCOL_VERSION,
@@ -251,8 +384,6 @@ class SporkPlayground extends HTMLElement {
       });
     } else if (result.kind === "incomplete") {
       this.appendEntry("incomplete", "The form is incomplete.");
-    } else if (!result.stdout && !result.stderr) {
-      this.appendEntry("empty", "definition accepted");
     }
 
     this.setStatus(`ready · namespace ${result.namespace || "user"}`, "ready");
@@ -271,7 +402,6 @@ class SporkPlayground extends HTMLElement {
   }
 
   reset() {
-    this.appendEntry("system", "Runtime reset. Session state was cleared.");
     this.restart("reset");
   }
 
@@ -287,15 +417,12 @@ class SporkPlayground extends HTMLElement {
     const label = document.createElement("p");
     label.className = "playground-entry-label";
     const labels = {
-      source: "source",
       stdout: "output",
       stderr: "stderr",
       value: "value",
       error: "error",
       incomplete: "incomplete",
-      empty: "result",
       timeout: "runtime restarted",
-      system: "runtime",
     };
     label.textContent = labels[kind] || kind;
     const body = document.createElement("pre");

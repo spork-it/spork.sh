@@ -68,14 +68,14 @@
           ($script {:src "/docs-search.js" :defer true})
           nil)
         (if (= (:route document) "/play/")
-          ($script {:src "/playground.js?v=0.1.1" :defer true})
+          ($script {:src "/playground.js?v=0.2.0" :defer true})
           nil)
         (if (is (get document :sitemap true) false)
           ($meta {:name "robots" :content "noindex"})
           nil)
         ($link {:rel "canonical" :href (canonical-url document)})
         ($link {:rel "icon" :href "/favicon.svg" :type "image/svg+xml"})
-        ($link {:rel "stylesheet" :href "/site.css?v=0.2.0"})
+        ($link {:rel "stylesheet" :href "/site.css?v=0.3.0"})
         ($meta {:property "og:type" :content "website"})
         ($meta {:property "og:site_name" :content "Spork"})
         ($meta {:property "og:title" :content title})
@@ -139,7 +139,9 @@
     (raw-html "<!doctype html>")
     ($html {:lang "en"}
       (document-head document)
-      ($body
+      ($body {:class (if (= (:route document) "/play/")
+                       "playground-route"
+                       nil)}
         ($a {:class "skip-link" :href "#main-content"} "Skip to content")
         (site-header document)
         body
@@ -460,9 +462,17 @@
               nil))
           (:content document))))))
 
+(defn playground-page [document]
+  (document-shell
+    document
+    (markup
+      ($main {:id "main-content" :class "playground-page"}
+        (:content document)))))
+
 (defn render-document [documents document]
   (cond
     (= (:route document) "/") (home-page document)
+    (= (:route document) "/play/") (playground-page document)
     (.startswith (:route document) "/docs/")
       (documentation-page documents document)
     :else (standard-page document)))
