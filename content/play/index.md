@@ -26,7 +26,7 @@ priority: 0.9
       </div>
       <div class="playground-code-editor">
         <pre class="playground-highlight" data-playground-highlight aria-hidden="true"><code></code></pre>
-        <textarea id="playground-source" data-playground-source wrap="off" spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="playground-session-note">(defn square [n]&#10;  (* n n))&#10;&#10;(vec (map square [1 2 3 4 5]))</textarea>
+        <textarea id="playground-source" data-playground-source wrap="off" spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="playground-session-note">; Runs locally in browser-hosted CPython.&#10;(defn summarize [label values]&#10;  (let [numbers (vec values)]&#10;    {:label label&#10;     :values numbers&#10;     :total (reduce + numbers)}))&#10;&#10;(def report&#10;  (summarize "squares"&#10;    (map (fn [n] (* n n)) [1 2 3 4 5])))&#10;&#10;(print (fmt "{}: {}" (:label report) (:values report)))&#10;(print (fmt "total: {}" (:total report)))</textarea>
       </div>
     </section>
     <section class="playground-panel playground-output" aria-labelledby="playground-output-title">

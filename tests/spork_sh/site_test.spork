@@ -113,6 +113,8 @@
     (assert (in "<main class=\"playground-page\" id=\"main-content\">" playground))
     (assert (in "<spork-playground data-worker-url=\"/playground-worker.js?v=0.1.1\">" playground))
     (assert (in "data-playground-source" playground))
+    (assert (in "(defn summarize [label values]" playground))
+    (assert (in "(print (fmt \"{}: {}\"" playground))
     (assert (in "data-playground-highlight" playground))
     (assert (in "data-playground-run" playground))
     (assert (in "data-playground-stop" playground))
