@@ -5,7 +5,7 @@ section: reference
 group: tooling
 project: spork-lang
 order: 360
-package-version: "0.6.1"
+package-version: "0.6.2"
 changefreq: monthly
 priority: 0.7
 ---

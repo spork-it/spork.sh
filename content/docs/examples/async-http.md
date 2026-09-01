@@ -5,7 +5,7 @@ section: example
 group: examples
 project: spork-lang
 order: 820
-package-version: "0.6.1"
+package-version: "0.6.2"
 changefreq: monthly
 priority: 0.6
 ---

@@ -5,7 +5,7 @@ section: example
 group: examples
 project: spork-lang
 order: 850
-package-version: "0.6.1"
+package-version: "0.6.2"
 changefreq: monthly
 priority: 0.6
 ---
@@ -16,7 +16,7 @@ Create a normal Spork project with a site factory independent from any applicati
 ```spork
 {:name "tiny-site"
  :version "0.1.0"
- :spork-version "==0.6.1"
+ :spork-version "==0.6.2"
  :dependencies ["spork-site==0.1.1"]
  :source-paths ["src"]
  :site {:target "tiny-site.site:make-site"

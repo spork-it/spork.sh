@@ -34,7 +34,7 @@ jobs:
       - name: Install documented package versions
         run: |
           python -m pip install \
-            "spork-lang==0.6.1" \
+            "spork-lang==0.6.2" \
             "spork-runtime==0.1.1" \
             "spork-pds==0.1.4" \
             "spork-state==0.2.1" \

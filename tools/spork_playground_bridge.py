@@ -102,9 +102,9 @@ def evaluate(source: str) -> str:
     result = None
     with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
         try:
-            # spork-lang 0.6.1's backend stores session macros separately while
-            # one macro-expansion call still consults the process environment.
-            # Keep the two views synchronized until that release is retired.
+            # The backend stores session macros separately while one
+            # macro-expansion call still consults the process environment.
+            # Keep the two views synchronized until this compatibility path is retired.
             MACRO_ENV.update(_backend.macro_env)
             result = _backend.eval(source, capture_output=False)
             MACRO_ENV.update(_backend.macro_env)

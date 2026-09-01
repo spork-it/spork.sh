@@ -19,7 +19,7 @@ Declare the package and a source factory in `spork.it`:
 
 <!-- verify-docs: compile=manifest-fragment -->
 ```spork
-{:spork-version "==0.6.1"
+{:spork-version "==0.6.2"
  :dependencies ["spork-site==0.1.1"]
  :source-paths ["src"]
  :site {:target "example.site:make-site"

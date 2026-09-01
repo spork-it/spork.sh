@@ -6,7 +6,7 @@ group: packages
 nav-path: [packages, spork-lang]
 project: spork-lang
 order: 610
-package-version: "0.6.1"
+package-version: "0.6.2"
 changefreq: monthly
 priority: 0.7
 ---
@@ -16,7 +16,7 @@ priority: 0.7
 ## Install
 
 ```bash
-python -m pip install "spork-lang==0.6.1"
+python -m pip install "spork-lang==0.6.2"
 spork version
 ```
 
@@ -38,5 +38,5 @@ Compiled applications normally depend on [`spork-runtime`](/docs/packages/spork-
 - [Standard library reference](/docs/reference/standard-library/)
 - [Tooling reference](/docs/reference/tooling/)
 - [Source](https://github.com/spork-it/spork-lang)
-- [PyPI](https://pypi.org/project/spork-lang/0.6.1/)
-- [Release](https://github.com/spork-it/spork-lang/releases/tag/v0.6.1)
+- [PyPI](https://pypi.org/project/spork-lang/0.6.2/)
+- [Release](https://github.com/spork-it/spork-lang/releases/tag/v0.6.2)

@@ -5,7 +5,7 @@ section: reference
 group: standard-library
 project: spork-lang
 order: 510
-package-version: "0.6.1"
+package-version: "0.6.2"
 changefreq: monthly
 priority: 0.7
 ---

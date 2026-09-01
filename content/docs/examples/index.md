@@ -6,7 +6,7 @@ group: examples
 project: spork-lang
 order: 800
 nav-title: Examples
-package-version: "0.6.1"
+package-version: "0.6.2"
 changefreq: monthly
 priority: 0.6
 ---
