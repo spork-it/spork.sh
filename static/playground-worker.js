@@ -109,11 +109,13 @@ async function initialize() {
   const runtime = validateRuntime(await fetchJSON(RUNTIME_MANIFEST_URL));
 
   post("status", { state: "loading-pyodide" });
-  importScripts(`${runtime.pyodide.indexURL}pyodide.js`);
-  if (typeof loadPyodide !== "function") {
-    throw new Error("Pinned Pyodide loader did not define loadPyodide");
+  const pyodideModule = await import(`${runtime.pyodide.indexURL}pyodide.mjs`);
+  if (typeof pyodideModule.loadPyodide !== "function") {
+    throw new Error("Pinned Pyodide module did not export loadPyodide");
   }
-  const pyodide = await loadPyodide({ indexURL: runtime.pyodide.indexURL });
+  const pyodide = await pyodideModule.loadPyodide({
+    indexURL: runtime.pyodide.indexURL,
+  });
   const pyodideLoaded = performance.now();
 
   post("status", { state: "loading-spork" });

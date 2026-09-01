@@ -7,7 +7,7 @@ priority: 0.9
 
 The playground runs the real Spork compiler, runtime, and persistent collections inside browser-hosted CPython. Your source stays in this browser; there is no Spork evaluation server.
 
-<spork-playground data-worker-url="/playground-worker.js?v=0.1.0">
+<spork-playground data-worker-url="/playground-worker.js?v=0.1.1">
   <div class="playground-editor">
     <div class="playground-editor-heading">
       <label for="playground-source">Spork source</label>

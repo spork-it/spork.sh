@@ -68,7 +68,7 @@
           ($script {:src "/docs-search.js" :defer true})
           nil)
         (if (= (:route document) "/play/")
-          ($script {:src "/playground.js?v=0.1.0" :defer true})
+          ($script {:src "/playground.js?v=0.1.1" :defer true})
           nil)
         (if (is (get document :sitemap true) false)
           ($meta {:name "robots" :content "noindex"})

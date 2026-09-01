@@ -108,7 +108,7 @@ class SporkPlayground extends HTMLElement {
     const workerURL = this.getAttribute("data-worker-url") || "/playground-worker.js";
     let worker;
     try {
-      worker = new Worker(workerURL);
+      worker = new Worker(workerURL, { type: "module" });
     } catch (error) {
       this.failStartup(error instanceof Error ? error.message : String(error));
       return;
