@@ -1,19 +1,19 @@
 ---
 title: Standard library reference
-description: Built-in values, collection operations, prelude macros, and std.* modules in Spork 0.6.0.
+description: Built-in values, collection operations, prelude macros, and std.* modules in Spork 0.6.1.
 section: reference
 group: standard-library
 project: spork-lang
 order: 390
 nav-title: Standard library
-package-version: "0.6.0"
+package-version: "0.6.1"
 changefreq: weekly
 priority: 0.8
 ---
 
 Every Spork namespace receives core runtime functions and the prelude automatically. Python-backed `std.*` namespaces provide focused string, map, and JSON operations. Reader syntax belongs to the [language reference](/docs/reference/language/reader-macros/).
 
-Use this section as the standard-library contract for Spork 0.6.0. Collection literals and language forms are described in the [language reference](/docs/reference/language/); the pages here describe the values and functions available to those forms.
+Use this section as the standard-library contract for Spork 0.6.1. Collection literals and language forms are described in the [language reference](/docs/reference/language/); the pages here describe the values and functions available to those forms.
 
 ## What is automatically available
 

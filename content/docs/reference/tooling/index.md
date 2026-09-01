@@ -5,12 +5,12 @@ section: reference
 group: tooling
 project: spork-lang
 order: 300
-package-version: "0.6.0"
+package-version: "0.6.1"
 changefreq: monthly
 priority: 0.7
 ---
 
-Spork project commands find the nearest `spork.it`, prepare an isolated environment, and use the compatible project-local toolchain declared by that manifest. This section is the complete tooling contract for Spork 0.6.0.
+Spork project commands find the nearest `spork.it`, prepare an isolated environment, and use the compatible project-local toolchain declared by that manifest. This section is the complete tooling contract for Spork 0.6.1.
 
 ## Create a project
 

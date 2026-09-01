@@ -6,7 +6,7 @@ group: packages
 nav-path: [packages, spork-lang]
 project: spork-lang
 order: 610
-package-version: "0.6.0"
+package-version: "0.6.1"
 changefreq: monthly
 priority: 0.7
 ---
@@ -16,7 +16,7 @@ priority: 0.7
 ## Install
 
 ```bash
-python -m pip install "spork-lang==0.6.0"
+python -m pip install "spork-lang==0.6.1"
 spork version
 ```
 
@@ -27,7 +27,7 @@ The hosted [installer](/docs/getting-started/) creates a managed environment and
 - the reader, macro expansion environment, compiler, and source maps;
 - direct file execution, expression execution, and the REPL;
 - `spork.it` project discovery, synchronization, checks, tests, builds, and distributions;
-- project-toolchain delegation and metadata-only command-provider discovery;
+- project-toolchain delegation, metadata-only command-provider discovery, and isolated managed global plugins;
 - the source import hook, LSP server, and nREPL integration.
 
 Compiled applications normally depend on [`spork-runtime`](/docs/packages/spork-runtime/), not the compiler. Persistent collection storage is supplied by [`spork-pds`](/docs/packages/spork-pds/).
@@ -38,5 +38,5 @@ Compiled applications normally depend on [`spork-runtime`](/docs/packages/spork-
 - [Standard library reference](/docs/reference/standard-library/)
 - [Tooling reference](/docs/reference/tooling/)
 - [Source](https://github.com/spork-it/spork-lang)
-- [PyPI](https://pypi.org/project/spork-lang/0.6.0/)
-- [Release](https://github.com/spork-it/spork-lang/releases/tag/v0.6.0)
+- [PyPI](https://pypi.org/project/spork-lang/0.6.1/)
+- [Release](https://github.com/spork-it/spork-lang/releases/tag/v0.6.1)

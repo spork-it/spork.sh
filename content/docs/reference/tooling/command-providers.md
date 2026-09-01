@@ -5,7 +5,7 @@ section: reference
 group: tooling
 project: spork-lang
 order: 370
-package-version: "0.6.0"
+package-version: "0.6.1"
 changefreq: monthly
 priority: 0.7
 ---
@@ -59,9 +59,27 @@ spork greet nested --format json
 spork greet --help
 ```
 
-Spork first checks static core commands, then `spork.commands.v1` metadata in the project's `.venv`, and then providers installed in the active launcher environment. A project provider shadows an active provider with the same name. Multiple providers for one name in the same scope are an error; malformed project metadata also prevents silent fallback to an active provider. Spork 0.6.0 does not provide a managed-global plugin installation workflow: declare providers as project dependencies or install them deliberately in the launcher environment.
+Spork checks static core commands, `spork.commands.v1` metadata in the project's `.venv`, providers installed in the active launcher environment, and finally explicitly managed global providers. A project provider shadows active and global versions of the same command, and an active provider shadows a managed global version. Multiple providers for one name in the same scope are an error; malformed higher-precedence metadata prevents silent fallback.
 
 Discovery reads distribution and entry-point metadata only. It does not import provider modules for top-level help or while considering other commands. Only the selected entry point is loaded. `spork --help` lists each valid extension with its distribution, version, and scope, while provider-owned forms such as `spork greet --help` pass through unchanged.
+
+## Managed global providers
+
+Install a provider explicitly when its commands should be convenient outside a synchronized project:
+
+```bash
+spork plugin add spork-greeter
+spork plugin add 'spork-greeter>=0.1,<0.2'
+spork plugin list
+spork plugin which greet
+spork plugin remove spork-greeter
+```
+
+Each requested distribution gets an isolated virtual environment containing the provider, its dependencies, and a compatible `spork-lang` command host. Spork keeps these environments and an atomic locked registry in the platform user-data directory. Set `SPORK_HOME` to replace that directory for a portable or administratively managed installation. A broken or missing environment is not silently ignored: command discovery reports repair guidance, and `plugin list` marks it as broken.
+
+Global plugins are conveniences, not project dependencies. Team projects and CI should still declare the provider in `:dependencies` and run `spork sync`; the project-local provider then predictably shadows the global installation. When a global provider host does not satisfy the project's `:spork-version`, Spork refuses to execute it and recommends adding the provider to the project. `spork plugin` itself is a non-delegated bootstrap command, so running it inside a project always manages the user's global registry.
+
+Providers are trusted executable packages. Spork never installs one because a project mentions a command, never copies a global provider into a project implicitly, and does not import unselected providers during discovery.
 
 The provider receives `CommandContext` and a fresh list containing the exact strings after the top-level command. Returning `nil`/`None` means success, and an exact integer becomes the process status. Booleans and other result types are invalid. Broken selected entry points produce concise diagnostics; unexpected provider exceptions are not hidden. Project-backed contexts expose the selected manifest and source runtime.
 

@@ -5,7 +5,7 @@ section: editor
 group: editors
 project: spork-lang
 order: 720
-package-version: "0.6.0"
+package-version: "0.6.1"
 changefreq: monthly
 priority: 0.6
 ---
@@ -154,4 +154,4 @@ M-x spork-connect
 
 ## Source
 
-The integration source is maintained in the [`spork-lang` editor directory](https://github.com/spork-it/spork-lang/tree/v0.6.0/editors/emacs/).
+The integration source is maintained in the [`spork-lang` editor directory](https://github.com/spork-it/spork-lang/tree/v0.6.1/editors/emacs/).

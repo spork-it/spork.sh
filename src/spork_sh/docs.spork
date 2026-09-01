@@ -11,7 +11,7 @@
 (def site-url "https://spork.sh")
 
 (def package-versions
-  {"spork-lang" "0.6.0"
+  {"spork-lang" "0.6.1"
    "spork-runtime" "0.1.1"
    "spork-pds" "0.1.4"
    "spork-state" "0.2.1"

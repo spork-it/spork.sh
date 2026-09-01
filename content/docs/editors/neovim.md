@@ -5,7 +5,7 @@ section: editor
 group: editors
 project: spork-lang
 order: 710
-package-version: "0.6.0"
+package-version: "0.6.1"
 changefreq: monthly
 priority: 0.6
 ---
@@ -216,4 +216,4 @@ Ensure the plugin is loaded before opening `.spork` files:
 
 ## Source
 
-The integration source is maintained in the [`spork-lang` editor directory](https://github.com/spork-it/spork-lang/tree/v0.6.0/editors/nvim/).
+The integration source is maintained in the [`spork-lang` editor directory](https://github.com/spork-it/spork-lang/tree/v0.6.1/editors/nvim/).

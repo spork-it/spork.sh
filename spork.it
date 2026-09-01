@@ -2,7 +2,7 @@
  :version "0.1.0"
  :description "The public Spork website"
  :requires-python ">=3.10"
- :spork-version "==0.6.0"
+ :spork-version "==0.6.1"
  :dependencies ["spork-site==0.1.1"]
  :source-paths ["src"]
  :test-paths ["tests"]
