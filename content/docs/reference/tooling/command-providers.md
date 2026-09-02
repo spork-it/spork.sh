@@ -5,7 +5,7 @@ section: reference
 group: tooling
 project: spork-lang
 order: 370
-package-version: "0.6.2"
+package-version: "0.6.3"
 changefreq: monthly
 priority: 0.7
 ---
@@ -65,7 +65,7 @@ Discovery reads distribution and entry-point metadata only. It does not import p
 
 ## Managed global providers
 
-Install a provider explicitly when its commands should be convenient outside a synchronized project:
+Install a published provider explicitly when its commands should be convenient outside a synchronized project:
 
 ```bash
 spork plugin add spork-greeter
@@ -74,6 +74,19 @@ spork plugin list
 spork plugin which greet
 spork plugin remove spork-greeter
 ```
+
+Before publishing, install a local Spork project directly from its root:
+
+```bash
+cd /path/to/spork-greeter
+spork plugin add .
+spork plugin which greet
+spork greet --help
+```
+
+A local path must identify a directory containing `spork.it`, or the manifest itself, and the project must declare at least one `:commands` entry. Spork validates the manifest and command targets, compiles the project into a wheel under temporary managed staging, and installs that wheel through the same isolated validation flow used for published providers. It does not write the project's `.spork-out/` or `dist/` directories.
+
+Local installation is a snapshot rather than an editable link. Run `spork plugin add .` again after changing the source; a valid reinstall atomically replaces the previous environment, while a build, dependency, metadata, or collision failure leaves the working installation untouched. The registry retains the canonical source location so repair diagnostics can direct Spork back to the same checkout. Bare local-path installation is specific to Spork projects; a Python provider project can use a named PEP 508 direct reference such as `spork-greeter @ file:///absolute/path`.
 
 Each requested distribution gets an isolated virtual environment containing the provider, its dependencies, and a compatible `spork-lang` command host. Spork keeps these environments and an atomic locked registry in the platform user-data directory. Set `SPORK_HOME` to replace that directory for a portable or administratively managed installation. A broken or missing environment is not silently ignored: command discovery reports repair guidance, and `plugin list` marks it as broken.
 

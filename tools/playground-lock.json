@@ -15,10 +15,10 @@
   },
   "packages": {
     "spork-lang": {
-      "version": "0.6.2",
-      "artifact": "spork_lang-0.6.2-py3-none-any.whl",
-      "url": "https://files.pythonhosted.org/packages/d5/0d/ca600b2d7cb891368a1f8944f7b5ddede12d582e49d9a525f40b16778fdf/spork_lang-0.6.2-py3-none-any.whl",
-      "sha256": "47e390bb2e4e538896b748bd71a1c98e084d031aa8086a111927c3151c75a32a"
+      "version": "0.6.3",
+      "artifact": "spork_lang-0.6.3-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/2f/94/9d0b657f21aa71d11a6c975279b0bdee6cd5eb408025e95adadc225c6ab0/spork_lang-0.6.3-py3-none-any.whl",
+      "sha256": "474e1f0e8b3fa7e5300ac011150e486b80d988eb4b01e1ad2cdd57cc96302183"
     },
     "spork-runtime": {
       "version": "0.1.1",

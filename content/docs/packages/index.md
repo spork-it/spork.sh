@@ -6,7 +6,7 @@ group: packages
 project: spork-lang
 order: 600
 nav-title: Package index
-package-version: "0.6.2"
+package-version: "0.6.3"
 version-label: independently versioned
 changefreq: monthly
 priority: 0.7

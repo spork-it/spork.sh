@@ -140,7 +140,7 @@ A dependency can own one complete top-level command. Providers declare metadata 
             :description "Generate a weather report"}}
 ```
 
-After installation, the package contributes `spork report ...`. Provider discovery inspects package metadata without importing every plugin, and project-local providers outrank providers installed with the active launcher.
+After installation, the package contributes `spork report ...`. Provider discovery inspects package metadata without importing every plugin, and project-local providers outrank providers installed with the active launcher. While developing a provider, run `spork plugin add .` from its project root to build and install an isolated local snapshot before publishing it. See the [command-provider reference](/docs/reference/tooling/command-providers/) for replacement, removal, and precedence behavior.
 
 This website uses that system rather than a bespoke executable: its dependency on `spork-site` contributes `spork site check`, `spork site routes`, `spork site build`, and `spork site serve`.
 

@@ -5,7 +5,7 @@ section: reference
 group: tooling
 project: spork-lang
 order: 350
-package-version: "0.6.2"
+package-version: "0.6.3"
 changefreq: monthly
 priority: 0.7
 ---
@@ -91,6 +91,19 @@ Declare a test with the top-level `deftest` form. Test bodies are registered whe
 ```
 
 `spork test` discovers any `.spork` file containing a direct top-level `deftest` below either `:source-paths` or `:test-paths`. File names do not affect discovery, and files without declarations are ignored.
+
+Narrow a run with file, directory, exact-test, or substring selectors:
+
+```bash
+spork test tests/hello_spork/core_test.spork
+spork test tests/hello_spork/
+spork test tests/hello_spork/core_test.spork::greet-works
+spork test --test hello-spork.core-test/greet-works
+spork test --filter greet
+spork test -k greet
+```
+
+`FILE::TEST` selects one declaration in one file. Repeatable `--test NAME` accepts an unqualified declaration name or its qualified `namespace/name`; `--filter` and `-k` match a case-sensitive substring against both forms. A selector that matches no declared test fails rather than silently running the full suite.
 
 Each declared test runs independently, and an uncaught exception marks only that declaration as failed. Async declarations written as `(deftest ^async name ...)` are awaited by the runner. Files are isolated in separate processes.
 

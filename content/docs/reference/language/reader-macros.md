@@ -5,12 +5,12 @@ section: reference
 group: language
 project: spork-lang
 order: 105
-package-version: "0.6.2"
+package-version: "0.6.3"
 changefreq: monthly
 priority: 0.7
 ---
 
-Reader macros are fixed prefix syntax recognized while Spork source is read into forms. They run before ordinary compilation and are distinct from user-defined macros created with `defmacro`. This page defines every reader-macro prefix in Spork 0.6.2.
+Reader macros are fixed prefix syntax recognized while Spork source is read into forms. They run before ordinary compilation and are distinct from user-defined macros created with `defmacro`. This page defines every reader-macro prefix in Spork 0.6.3.
 
 Comments, scalar tokens, and delimiters are covered by [lexical syntax](/docs/reference/language/lexical-syntax/). Although it also begins with `#`, `#{...}` is a persistent set literal rather than a reader-macro transformation.
 

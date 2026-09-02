@@ -52,7 +52,7 @@
     (assert (= (mapv :label groups)
                ["Start" "Guides" "Language reference" "Standard library"
                 "Tooling reference" "Packages" "Editors" "Examples"]))
-    (assert (= (docs.package-version language) "0.6.2"))
+    (assert (= (docs.package-version language) "0.6.3"))
     (assert (= (mapv :label (:children packages))
                ["spork-lang" "spork-runtime" "spork-pds" "spork-state" "spork-site"]))
     (assert (= (count (:documents pds)) 6))

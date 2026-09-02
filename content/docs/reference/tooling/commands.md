@@ -5,7 +5,7 @@ section: reference
 group: tooling
 project: spork-lang
 order: 340
-package-version: "0.6.2"
+package-version: "0.6.3"
 changefreq: monthly
 priority: 0.7
 ---
@@ -28,12 +28,12 @@ The commands in this reference belong to the `spork-lang` launcher. Package-owne
 | `spork clean --all` | Also removes build and distribution artifacts. |
 | `spork lsp` | Starts the Language Server Protocol server on standard input/output. |
 | `spork version` | Prints the Spork, Python, and platform versions. |
-| `spork plugin add <requirement>` | Installs a command provider in its own managed global environment. |
+| `spork plugin add <requirement-or-path>` | Installs a published provider or a local Spork provider snapshot in its own managed global environment. |
 | `spork plugin remove <package>` | Removes one managed global provider. |
 | `spork plugin list` | Lists managed providers, commands, versions, and environment status. |
 | `spork plugin which <command>` | Explains the active provider and any shadowed providers. |
 
-Use `spork <command> --help` for command-specific options. Install any project-specific development dependencies before testing with `spork sync --dev`. The `plugin` command is a non-delegated bootstrap command: inside a project it still manages global conveniences, while normal project providers remain dependencies synchronized into `.venv`.
+Use `spork <command> --help` for command-specific options. Install any project-specific development dependencies before testing with `spork sync --dev`. The `plugin` command is a non-delegated bootstrap command: inside a project it still manages global conveniences, while normal project providers remain dependencies synchronized into `.venv`. From a provider's project root, `spork plugin add .` builds and installs a validated snapshot for local testing; see [command providers](/docs/reference/tooling/command-providers/#managed-global-providers) for lifecycle and isolation details.
 
 ## Standalone commands
 

@@ -5,7 +5,7 @@ section: example
 group: examples
 project: spork-lang
 order: 840
-package-version: "0.6.2"
+package-version: "0.6.3"
 changefreq: monthly
 priority: 0.6
 ---
@@ -38,11 +38,21 @@ A provider package declares one complete top-level command and owns every argume
   0)
 ```
 
-Validate and package it:
+Validate it, then install the current checkout for an end-to-end command test:
 
 ```bash
 spork check
+spork plugin add .
+spork plugin which greet
+spork greet
+```
+
+The local installation compiles a temporary wheel and installs a validated snapshot in an isolated managed environment. It does not use or modify the project's `.spork-out/` or `dist/` directories. Run `spork plugin add .` again after editing, and remove the snapshot with `spork plugin remove spork-greeter` when testing is complete.
+
+Build the publication artifacts separately:
+
+```bash
 spork dist --clean
 ```
 
-The distribution contains a `spork.commands.v1` entry point. After adding the wheel as a consumer dependency and synchronizing, invoke it with `spork greet`. Top-level discovery reads package metadata without importing the provider; only selection loads the compiled function. See the complete [command-provider contract](/docs/reference/tooling/command-providers/).
+The distribution contains a `spork.commands.v1` entry point. After adding the published package or wheel as a consumer dependency and synchronizing, invoke it with `spork greet`. Top-level discovery reads package metadata without importing the provider; only selection loads the compiled function. See the complete [command-provider contract](/docs/reference/tooling/command-providers/).
